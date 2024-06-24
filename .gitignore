@@ -1,0 +1,10 @@
+# Node.js dependencies
+node_modules/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# IDE and editor files
+.vscode/
+*.idea/

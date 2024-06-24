@@ -1,0 +1,15 @@
+{
+  "name": "dirfil",
+  "version": "0.1.0",
+  "description": "A tool for processing directory structures",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "chuSS",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
+  }
+}
