@@ -10,67 +10,83 @@ async function isValidPath(dirPath) {
   }
 }
 
-async function convertToNativePath(path) {
-  return path.replace(/\\/g, '\\');
+function getAbsolutePath(relativePath) {
+  if (path.isAbsolute(relativePath)) {
+    return path.normalize(relativePath);
+  }
+  return path.resolve(process.cwd(), relativePath);
 }
 
 async function processDir(dirPath) {
   try {
-    const files = await fs.readdir(dirPath);
-    const tasks = files.map(async (file) => {
+    const files = await fs.readdir(dirPath, { withFileTypes: true });
+    const tasks = files.map(async (dirent) => {
+      const filePath = path.join(dirPath, dirent.name);
       try {
-        const filePath = path.join(dirPath, file);
-        const stats = await fs.lstat(filePath);
-        if (stats.isDirectory()) {
+        if (dirent.isDirectory()) {
           const dirObj = await processDir(filePath);
           return {
-            name: file,
+            name: dirent.name,
             type: 'directory',
-            dirsize: dirObj.dirsize,
+            size: dirObj.size,
             children: dirObj.children,
           };
-        } else if (stats.isFile()) {
+        } else if (dirent.isFile()) {
+          const stats = await fs.stat(filePath);
           return {
-            name: file,
+            name: dirent.name,
             type: 'file',
             size: stats.size,
           };
-        } else if (stats.isSymbolicLink()) {
+        } else if (dirent.isSymbolicLink()) {
+          const linkPath = await fs.readlink(filePath);
           return {
-            name: file,
+            name: dirent.name,
             type: 'link',
+            link: linkPath,
           };
+        } else {
+          console.warn(`Неизвестный тип файла: ${filePath}`);
+          return null;
         }
       } catch (err) {
-        if (err.code !== 'ENOENT' && err.code !== 'EPERM') {
-          throw err;
+        if (err.code === 'ENOENT') {
+          console.warn(`Файл или директория не существует: ${filePath}`);
+          return null;
+        } else if (err.code === 'EPERM') {
+          console.warn(`Нет прав доступа к: ${filePath}`);
+          return null;
+        } else {
+          console.error(`Непредвиденная ошибка при обработке ${filePath}: ${err.message}`);
+          return null;
         }
       }
     });
-    const result = await Promise.all(tasks);
-    const dirsize = result.reduce((acc, curr) => {
-      if (curr?.type === 'directory') {
-        return acc + curr.dirsize;
-      } else if (curr?.type === 'file') {
-        return acc + curr.size;
-      } else {
-        return acc;
-      }
-    }, 0);
+
+    const result = (await Promise.all(tasks)).filter(Boolean);
+    const size = result.reduce((acc, curr) => 
+      acc + (curr.type === 'directory' ? curr.size : curr.size || 0), 0);
+
     return {
       name: path.basename(dirPath),
       type: 'directory',
-      dirsize: dirsize,
-      children: result.length ? result : [],
+      size,
+      children: result,
     };
   } catch (err) {
-    console.error(`Error processing directory ${dirPath}: ${err}`);
-    throw err;
+    console.error(`Ошибка при обработке директории ${dirPath}: ${err}`);
+    return {
+      name: path.basename(dirPath),
+      type: 'directory',
+      size: 0,
+      children: [],
+      error: err.message
+    };
   }
 }
 
 module.exports = {
   isValidPath,
+  getAbsolutePath,
   processDir,
-  convertToNativePath,
 };
