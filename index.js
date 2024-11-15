@@ -4,44 +4,56 @@ const express = require('express');
 const { processDir, isValidPath } = require('./util');
 const path = require('path');
 
+// Создание экземпляра Express приложения
 const app = express();
+// Порт для HTTP и WebSocket сервера
 const httpPort = 3000;
 
-// Serve static files from the public directory
+// Настройка статической файловой раздачи из директории public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Create the HTTP server
+// Создание HTTP сервера с использованием Express
 const server = http.createServer(app);
 server.listen(httpPort, () => {
-  console.log(`HTTP server started on port ${httpPort}`);
+  console.log(`HTTP сервер запущен на порту ${httpPort}`);
 });
 
-// Create the WebSocket server
+// Создание WebSocket сервера поверх HTTP сервера
 const wss = new WebSocket.Server({ server });
 
+/**
+ * Обработчик WebSocket соединений
+ * Принимает путь директории от клиента, валидирует его и возвращает структуру файлов
+ */
 wss.on('connection', (ws, req) => {
-  console.log('WebSocket connection established');
+  console.log('WebSocket соединение установлено');
 
+  // Обработка сообщений от клиента
   ws.on('message', async (message) => {
-    const dirPath = message.toString(); // Convert the received Buffer to a string
-    console.log(`Received directory path: ${dirPath}`);
+    // Преобразование буфера в строку пути директории
+    const dirPath = message.toString();
+    console.log(`Получен путь директории: ${dirPath}`);
 
+    // Валидация пути директории
     if (!await isValidPath(dirPath)) {
-      console.error(`Invalid directory path: ${dirPath}`);
-      ws.send(JSON.stringify({ error: `Invalid directory path: ${dirPath}` }));
+      console.error(`Некорректный путь директории: ${dirPath}`);
+      ws.send(JSON.stringify({ error: `Некорректный путь директории: ${dirPath}` }));
       return;
     }
 
+    // Замер времени обработки директории
     const startTime = Date.now();
     const result = await processDir(dirPath);
     const endTime = Date.now();
     const elapsedTime = (endTime - startTime);
 
-    console.log(`Directory ${dirPath} processed in ${elapsedTime / 1000} seconds`);
+    // Логирование результатов обработки
+    console.log(`Директория ${dirPath} обработана за ${elapsedTime / 1000} секунд`);
 
+    // Отправка результата клиенту в формате JSON
     const jsonResult = JSON.stringify(result, null, 2);
     ws.send(jsonResult);
   });
 });
 
-console.log(`WebSocket server started on port ${httpPort}`);
+console.log(`WebSocket сервер запущен на порту ${httpPort}`);
